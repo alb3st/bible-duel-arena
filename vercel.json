@@ -1,0 +1,4 @@
+{
+  "buildCommand": "npm run build-only",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
