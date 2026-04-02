@@ -84,7 +84,11 @@
       <!-- Area soal -->
       <div class="bg-slate-800 rounded-2xl p-5 mb-4 min-h-[120px] flex items-center justify-center">
         <template v-if="store.currentQuestion">
-          <p class="text-lg font-semibold text-white text-center leading-snug">
+          <div v-if="store.currentQuestion.type === 'tebak-tokoh'" class="text-center w-full">
+            <p class="text-5xl mb-3 tracking-widest leading-relaxed">{{ store.currentQuestion.text }}</p>
+            <p class="text-slate-400 text-sm">Siapakah tokoh Alkitab ini?</p>
+          </div>
+          <p v-else class="text-lg font-semibold text-white text-center leading-snug">
             {{ store.currentQuestion.text }}
           </p>
         </template>
@@ -149,15 +153,31 @@
         <!-- Pilih soal dari bank -->
         <div class="bg-slate-800 rounded-2xl p-4 mb-3">
           <h4 class="text-slate-300 text-sm font-semibold mb-3">Pilih Soal:</h4>
+          <!-- Pilih kategori -->
+          <div class="flex gap-2 mb-3">
+            <button
+              v-for="cat in categories" :key="cat.id"
+              @click="selectedCategory = cat.id"
+              :class="selectedCategory === cat.id
+                ? 'bg-indigo-600 border-indigo-400 text-white'
+                : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-400'"
+              class="flex-1 text-xs py-2 border-2 rounded-lg transition font-semibold"
+            >
+              {{ cat.label }}
+            </button>
+          </div>
           <div class="space-y-2 max-h-64 overflow-y-auto pr-1">
             <button
-              v-for="(q, i) in questions" :key="i"
+              v-for="(q, i) in currentCategoryQuestions" :key="i"
               @click="selectedQuestion = q"
               :class="selectedQuestion === q
                 ? 'bg-indigo-600 border-indigo-400 text-white'
+                : usedQuestions.includes(q.text)
+                ? 'bg-slate-900 border-slate-700 text-slate-500'
                 : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-slate-400'"
               class="w-full text-left border-2 rounded-xl px-3 py-2 text-xs transition-all"
             >
+              <span v-if="usedQuestions.includes(q.text)" class="text-green-600 mr-1 font-bold">✓</span>
               {{ i + 1 }}. {{ q.text }}
             </button>
           </div>
@@ -191,16 +211,20 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/gameStore.js'
-import { questions } from '@/data/questions.js'
+import { questionsByCategory, categories } from '@/data/questions.js'
 
 const router = useRouter()
 const store  = useGameStore()
 
 const selectedQuestion = ref(null)
+const selectedCategory = ref('tebak-jawaban')
+const usedQuestions    = ref([])
 const answerFeedback   = ref(null)  // 'correct' | 'wrong' | 'too_late' | null
 const answering        = ref(false)
 const hasAnswered      = ref(false)
 const myWrongAnswers   = ref([])
+
+const currentCategoryQuestions = computed(() => questionsByCategory[selectedCategory.value] ?? [])
 
 // Daftar pemain diurutkan berdasarkan skor (tertinggi dulu)
 const sortedPlayers = computed(() =>
@@ -225,6 +249,7 @@ async function handleAnswer(option) {
   } else if (result?.result === 'wrong') {
     answerFeedback.value = 'wrong'
     myWrongAnswers.value.push(option)
+    hasAnswered.value = true
   } else {
     answerFeedback.value = 'too_late'
     hasAnswered.value = true
@@ -236,6 +261,9 @@ async function handleAnswer(option) {
 
 async function handleBroadcast() {
   if (!selectedQuestion.value) return
+  if (!usedQuestions.value.includes(selectedQuestion.value.text)) {
+    usedQuestions.value.push(selectedQuestion.value.text)
+  }
   await store.broadcastQuestion(selectedQuestion.value)
   selectedQuestion.value = null
 }
@@ -248,6 +276,11 @@ async function handleLeave() {
   await store.leaveRoom()
   router.push('/')
 }
+
+// Reset pilihan soal saat kategori berganti
+watch(selectedCategory, () => {
+  selectedQuestion.value = null
+})
 
 // Reset state jawaban saat soal baru masuk
 watch(() => store.currentQuestion?.startedAt, () => {

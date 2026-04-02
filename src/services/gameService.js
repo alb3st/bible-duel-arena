@@ -145,10 +145,17 @@ export function listenToPlayers(roomCode, callback) {
 // ─── Question ─────────────────────────────────────────────
 
 export async function broadcastQuestion(roomCode, question) {
-  // question = { text, options: string[], answer: string }
+  // Acak urutan pilihan jawaban (Fisher-Yates shuffle)
+  const shuffledOptions = [...question.options]
+  for (let i = shuffledOptions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]]
+  }
+
   await update(ref(db, `rooms/${roomCode}`), {
     currentQuestion: {
       ...question,
+      options: shuffledOptions,
       startedAt: Date.now(),
       answered: false,
       firstAnswerer: null,
